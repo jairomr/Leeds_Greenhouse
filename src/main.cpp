@@ -1,52 +1,36 @@
 #include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <SPI.h>
 #include <SD.h>
 #include "RTClib.h"
+#include <LiquidCrystal_I2C.h>
+
+#include "Leeds_Help_Arduino.cpp"
 
 
 bool debug = 1; // 0 off | 1 on
 #define MAX_SENSOR_INT 4
 #define MAX_SENSOR_OUT 4
-#define BUTTON_OFF 12
-#define BUTTON_ON 11
-#define Exhaust_tolerance 150 //
+#define Exhaust_tolerance 70 // 0 a 100
 #define RANGE 1.85
-byte looptime = 1; //Minuto
+#define looptime 1 //Minuto
 #define desired_difference 3
 #define FILE_NAME "teste.dat"
 
-// Sensores 01 {0x28, 0xF1, 0x73, 0xFD, 0x0A, 0x00, 0x00, 0xFE }
-// Sensores 02 {0x28, 0xBD, 0xA7, 0xFC, 0x0A, 0x00, 0x00, 0x38 }
-// Sensores 03 {0x28, 0xEA, 0x73, 0xFC, 0x0A, 0x00, 0x00, 0xD2 }
-// Sensores 04 {0x28, 0xAC, 0x55, 0xFC, 0x0A, 0x00, 0x00, 0x71 }
-// Sensores 05 {0x28, 0x0D, 0xEB, 0xFC, 0x0A, 0x00, 0x00, 0xF7 }
-// Sensores 06 {0x28, 0x48, 0xCA, 0xFC, 0x0A, 0x00, 0x00, 0x5C }
-// Sensores 07 {0x28, 0xCC, 0x4E, 0xFC, 0x0A, 0x00, 0x00, 0xBE }
-// Sensores 08 {0x28, 0x9D, 0x59, 0xFC, 0x0A, 0x00, 0x00, 0x8A }
-// Sensores 09 {0x28, 0x90, 0xE3, 0xFC, 0x0A, 0x00, 0x00, 0x32 }
-// Sensores 10 {0x28, 0x3F, 0xB7, 0xFC, 0x0A, 0x00, 0x00, 0xC0 }
-// Sensores 11 {0x28, 0x14, 0xAC, 0xFC, 0x0A, 0x00, 0x00, 0x82 }
-// Sensores 12 {0x28, 0x14, 0x2E, 0xFD, 0x0A, 0x00, 0x00, 0x45 }
-// Sensores 13 {0x28, 0x3E, 0x7C, 0xFD, 0x0A, 0x00, 0x00, 0x2A }
-// Sensores 14 {0x28, 0x19, 0xD8, 0xFC, 0x0A, 0x00, 0x00, 0xBA }
-// Sensores 15 {0x28, 0xBC, 0x95, 0xFC, 0x0A, 0x00, 0x00, 0x08 }
-// Sensores 16 {0x28, 0x20, 0x60, 0xFC, 0x0A, 0x00, 0x00, 0xB0 }
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
-     {0x28, 0x9D, 0x59, 0xFC, 0x0A, 0x00, 0x00, 0x8A },
-     {0x28, 0x9D, 0x59, 0xFC, 0x0A, 0x00, 0x00, 0x8A },
-     {0x28, 0xBC, 0x95, 0xFC, 0x0A, 0x00, 0x00, 0x08 },
-     {0x28, 0xF1, 0x73, 0xFD, 0x0A, 0x00, 0x00, 0xFE }
+     TEMPERATURE_SENSOR_08,
+     TEMPERATURE_SENSOR_08,
+     TEMPERATURE_SENSOR_15,
+     TEMPERATURE_SENSOR_13
    };
                                       
 uint8_t sensor_out[MAX_SENSOR_OUT][8] = {
-    {0x28, 0xBC, 0x95, 0xFC, 0x0A, 0x00, 0x00, 0x08 },
-    {0x28, 0x9D, 0x59, 0xFC, 0x0A, 0x00, 0x00, 0x8A },
-    {0x28, 0xF1, 0x73, 0xFD, 0x0A, 0x00, 0x00, 0xFE },
-    {0x28, 0xF1, 0x73, 0xFD, 0x0A, 0x00, 0x00, 0xFE }
+    TEMPERATURE_SENSOR_08,
+    TEMPERATURE_SENSOR_15,
+    TEMPERATURE_SENSOR_10,
+    TEMPERATURE_SENSOR_11
   };
 
 float temp_int[MAX_SENSOR_INT];
@@ -65,78 +49,11 @@ RTC_DS1307 rtc;
 
 File file;
 #define ONE_WIRE_BUS 3
+#define BUTTON_OFF 12
+#define BUTTON_ON 11
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
-
-
-
-
-byte heppy[8] = {
-  0b00000,
-  0b11011,
-  0b11011,
-  0b00000,
-  0b00000,
-  0b10001,
-  0b01110,
-  0b00000
-};
-
-byte neve[8] = {
-  0b00000,
-  0b00000,
-  0b10101,
-  0b01110,
-  0b11011,
-  0b01110,
-  0b10101,
-  0b00000
-};
-
-byte fire[8] = {
-  0b10010,
-  0b01001,
-  0b01001,
-  0b10010,
-  0b10010,
-  0b10010,
-  0b01001,
-  0b01001
-};
-
-
-byte indor[8] = {
-  0b00000,
-  0b00000,
-  0b00000,
-  0b11111,
-  0b10001,
-  0b10001,
-  0b10001,
-  0b10101
-};
-byte outdor[8] = {
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00100,
-  0b11111
-};
-
-byte correto[8] = {
-  0b00000,
-  0b00001,
-  0b00010,
-  0b00010,
-  0b10100,
-  0b01000,
-  0b00000,
-  0b00000
-};
 
 
 void stater_datalooger(){
@@ -290,47 +207,57 @@ void setup() {
 
 }
 
-void loop() {
-  if(average_inside == -999 || average_outside == -999){
-        
-        lcd.clear();  
-        lcd.setCursor(0, 0);
-        lcd.print(F("     !!Error!!     "));
-        lcd.setCursor(0, 2);
-        lcd.print(F(" Temperature sensor "));
-        lcd.setCursor(0, 3);
-        lcd.print(F(" error, I can't act "));
-        print_debug_status();
-        all_off();  
-        my_delay();
-    
-  }else{
-    if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
-      if (tempdiff <= (max_targetdiff-(max_targetdiff*Exhaust_tolerance/100))){
-          all_off();
-      }
-      
-    }
-    else{
-      climate_control_actions();  
-    }
-    read_temp_diff();
-    record_SD();
-    for(int i = 0; i < looptime*6; i++ ){
-        lcd_print(1);
-        read_temp_diff();
-        lcd_print(0);
-    }
-      
 
-    
-    //my_delay();
+
+/**
+ * Prints
+ */
+void decimal_number_writing(int valor){
+  if (valor < 10){
+    file.print(F("0"));
   }
+  file.print(valor);
+}
 
-  
+void print_decimal0(int _time ){
+  if (_time < 10){
+      lcd.print(F("0"));
+  }
+  lcd.print(_time);
+}
+ 
+void print_tm_f(float temp){
+  if (temp >= 0) {
+    lcd.print("+");
+  }
+  lcd.print(temp,1);
   
 }
 
+void print_good_or_bad(float d){
+  if (d != -999)  {
+    lcd.write((uint8_t)3);
+  }else{
+    lcd.print(F("x"));
+  }
+}
+void print_status(){
+   lcd.setCursor(19, 3);
+   if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
+    lcd.write((uint8_t)0);
+  }else{
+    if(tempdiff < min_targetdiff ){
+      lcd.write((uint8_t)1);
+    }else{
+      lcd.write((uint8_t)2);
+    }
+  }
+}
+
+
+/**
+ * End Prints
+ */
 
 
 
@@ -429,21 +356,7 @@ void lcd_print(byte view) {
 }
 
 
-void print_tm_f(float temp){
-  if (temp >= 0) {
-    lcd.print("+");
-  }
-  lcd.print(temp,1);
-  
-}
 
-void print_good_or_bad(float d){
-  if (d != -999)  {
-    lcd.write((uint8_t)3);
-  }else{
-    lcd.print(F("x"));
-  }
-}
 
 
 
@@ -458,22 +371,10 @@ void my_delay(){
 
 
 
-void print_status(){
-   lcd.setCursor(19, 3);
-   if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
-    lcd.write((uint8_t)0);
-  }else{
-    if(tempdiff < min_targetdiff ){
-      lcd.write((uint8_t)1);
-    }else{
-      lcd.write((uint8_t)2);
-    }
-  }
-}
 
 
-int open_file_recording(char filename[]){
-  file = SD.open(filename, FILE_WRITE);
+int open_file_recording(){
+  file = SD.open(FILE_NAME, FILE_WRITE);
   if (file){
     return 1;
   }else{
@@ -492,7 +393,7 @@ void fecha_arquivo(){
 void record_SD(){
   DateTime t = rtc.now();
   if(!SD.exists(FILE_NAME)){
-    open_file_recording(FILE_NAME);
+    open_file_recording();
     file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,heating,exhaust"));
     lcd.clear();
     lcd.setCursor(0, 2);
@@ -503,7 +404,7 @@ void record_SD(){
     file.close();
     
   }
-  bool status_file = open_file_recording(FILE_NAME);
+  bool status_file = open_file_recording();
   if(debug==1){
     if(status_file){
       lcd.clear();
@@ -559,27 +460,43 @@ void record_SD(){
   file.print(F(","));
   file.print(FLAG_EXHAUST);
   file.print(FLAG_HEATING);
-
-  
-
-  
   fecha_arquivo();
 }
 
-void decimal_number_writing(int valor){
-  if (valor < 10)
-  {
-    file.print(F("0"));
-  }
-  file.print(valor);
-}
-
-void print_decimal0(int _time ){
-   if (_time < 10){
-      lcd.print(F("0"));
-  }
-  lcd.print(_time);
-}
- 
 
  
+void loop() {
+  if(average_inside == -999 || average_outside == -999){
+        
+        lcd.clear();  
+        lcd.setCursor(0, 0);
+        lcd.print(F("     !!Error!!     "));
+        lcd.setCursor(0, 2);
+        lcd.print(F(" Temperature sensor "));
+        lcd.setCursor(0, 3);
+        lcd.print(F(" error, I can't act "));
+        print_debug_status();
+        all_off();  
+        delay(10000);
+    
+  }else{
+    if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
+      if (tempdiff <= (max_targetdiff-((RANGE+RANGE)*Exhaust_tolerance/100))){
+          all_off();
+      }
+      
+    }
+    else{
+      climate_control_actions();  
+    }
+    read_temp_diff();
+    record_SD();
+    for(int i = 0; i < looptime*6; i++ ){
+        lcd_print(1);
+        read_temp_diff();
+        lcd_print(0);
+    }
+
+  }
+  
+}
