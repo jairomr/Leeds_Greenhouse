@@ -9,35 +9,39 @@
 #include "Leeds_Help_Arduino.cpp"
 
 
-bool debug = 1; // 0 off | 1 on
+bool debug = 0; // 0 off | 1 on
 #define MAX_SENSOR_INT 4
 #define MAX_SENSOR_OUT 4
 #define Exhaust_tolerance 70 // 0 a 100
 #define RANGE 1.85
 #define looptime 1 //Minuto
-#define desired_difference 3
+#define desired_difference 0
 #define FILE_NAME "teste.dat"
 
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
-     TEMPERATURE_SENSOR_08,
-     TEMPERATURE_SENSOR_08,
-     TEMPERATURE_SENSOR_15,
-     TEMPERATURE_SENSOR_13
+     TEMPERATURE_SENSOR_01,
+     TEMPERATURE_SENSOR_02,
+     TEMPERATURE_SENSOR_03,
+     TEMPERATURE_SENSOR_04
    };
                                       
 uint8_t sensor_out[MAX_SENSOR_OUT][8] = {
-    TEMPERATURE_SENSOR_08,
-    TEMPERATURE_SENSOR_15,
-    TEMPERATURE_SENSOR_10,
-    TEMPERATURE_SENSOR_11
+    TEMPERATURE_SENSOR_05,
+    TEMPERATURE_SENSOR_06,
+    TEMPERATURE_SENSOR_07,
+    TEMPERATURE_SENSOR_08
   };
 
+#define number_Moving_average 15
+float temp_int_media[MAX_SENSOR_INT][number_Moving_average];
+float temp_out_media[MAX_SENSOR_OUT][number_Moving_average];
 float temp_int[MAX_SENSOR_INT];
 float temp_out[MAX_SENSOR_OUT];
+float average_inside, average_outside, tempdiff, min_targetdiff, max_targetdiff; 
 
-float average_inside, average_outside, tempdiff, min_targetdiff, max_targetdiff;
-bool FLAG_HEATING, FLAG_EXHAUST;
+
+bool FLAG_HEATING, FLAG_EXHAUST; // Flags 
 
 
 int __cont = 0;
@@ -81,10 +85,9 @@ void stater_datalooger(){
   delay(5000);
 }
 
-float sum_temp(float valor){
+
+float temperature_validation(float valor){
   if(valor>-50 && valor<61){
-      __sum = __sum + valor;
-      __cont = __cont + 1;
       return valor;
     }else{
       return -999;
@@ -92,11 +95,36 @@ float sum_temp(float valor){
 }
 
 
-float average(){
-  if(__cont >0){
-    return __sum/__cont;
-  }else{
+float average(bool int_or_out){
+  if(int_or_out == 0 ){
+    __sum = 0;
+    __cont = 0;
+    for (int i = 0; i < MAX_SENSOR_OUT; i++){
+      if(temp_out[i] != -999){
+        __sum = __sum + temp_out[i];
+        __cont = __cont + 1;
+      }
+      
+    }
+    if(__cont > 0){
+      return __sum/__cont;
+    }
     return -999;
+  }else{
+    __sum = 0;
+    __cont = 0;
+    for (int i = 0; i < MAX_SENSOR_INT; i++){
+      if(temp_int[i] != -999){
+        __sum = __sum + temp_int[i];
+        __cont = __cont + 1;
+      }
+      
+    }
+    if(__cont > 0){
+      return __sum/__cont;
+    }
+    return -999;
+
   }
 }
 
@@ -105,22 +133,53 @@ float average(){
  *
  **/
 void _average_temp(){
-  __sum = 0;
-  __cont = 0;
+  //externo
   for (int i = 0; i < MAX_SENSOR_OUT; i++){
     sensors.requestTemperatures();
-    temp_out[i] = sum_temp(sensors.getTempC(sensor_out[i]));
+    for (int j = number_Moving_average - 1; j > 0; j--){
+      temp_out_media[i][j] = temp_out_media[i][j-1];
+    }
+    temp_out_media[i][0] = temperature_validation(sensors.getTempC(sensor_out[i]));
+    __sum = 0;
+    __cont = 0;
+    for (int j = 0; j < number_Moving_average; j++){
+      if(temp_out_media[i][j] != -999){
+        __sum = __sum + temp_out_media[i][j];
+        __cont = __cont + 1;
+      }
+    }
+    if(__cont > 0){
+      temp_out[i] = __sum/__cont;
+    }else{
+      temp_out[i] = -999;
+    }
     delay(50);
   }
-  average_outside = average();
-  __sum = 0;
-  __cont = 0;
-  for(int i = 0; i < MAX_SENSOR_INT; i++){
+  average_outside = average(0);
+
+  // interno
+  for (int i = 0; i < MAX_SENSOR_INT; i++){
     sensors.requestTemperatures();
-    temp_int[i] = sum_temp(sensors.getTempC(sensor_int[i]));
+    for (int j = number_Moving_average - 1; j > 0; j--){
+      temp_int_media[i][j] = temp_int_media[i][j-1];
+    }
+    temp_int_media[i][0] = temperature_validation(sensors.getTempC(sensor_int[i]));
+    __sum = 0;
+    __cont = 0;
+    for (int j = 0; j < number_Moving_average; j++){
+      if(temp_int_media[i][j] != -999){
+        __sum = __sum + temp_int_media[i][j];
+        __cont = __cont + 1;
+      }
+    }
+    if(__cont > 0){
+      temp_int[i] = __sum/__cont;
+    }else{
+      temp_int[i] = -999;
+    }
     delay(50);
   }
-  average_inside = average();
+  average_inside = average(1);
   
 }
 
@@ -253,8 +312,6 @@ void print_status(){
     }
   }
 }
-
-
 /**
  * End Prints
  */
@@ -356,23 +413,6 @@ void lcd_print(byte view) {
 }
 
 
-
-
-
-
-void my_delay(){
-    if(debug == 0){
-      delay((looptime*60000)-15000);  
-    }else{
-      delay(looptime*5000);
-     }
-}
-
-
-
-
-
-
 int open_file_recording(){
   file = SD.open(FILE_NAME, FILE_WRITE);
   if (file){
@@ -394,7 +434,7 @@ void record_SD(){
   DateTime t = rtc.now();
   if(!SD.exists(FILE_NAME)){
     open_file_recording();
-    file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,heating,exhaust"));
+    file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,heating,exhaust\n"));
     lcd.clear();
     lcd.setCursor(0, 2);
     lcd.print(F(" creating file "));
@@ -457,15 +497,17 @@ void record_SD(){
       file.print(F(","));
     }
   }
-  file.print(F(","));
   file.print(FLAG_EXHAUST);
+  file.print(F(","));
   file.print(FLAG_HEATING);
+  file.print(F("\n"));
   fecha_arquivo();
 }
 
 
  
 void loop() {
+  read_temp_diff();
   if(average_inside == -999 || average_outside == -999){
         
         lcd.clear();  
@@ -484,12 +526,10 @@ void loop() {
       if (tempdiff <= (max_targetdiff-((RANGE+RANGE)*Exhaust_tolerance/100))){
           all_off();
       }
-      
     }
     else{
       climate_control_actions();  
     }
-    read_temp_diff();
     record_SD();
     for(int i = 0; i < looptime*6; i++ ){
         lcd_print(1);
