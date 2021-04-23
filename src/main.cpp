@@ -16,22 +16,22 @@ bool status_file;
 #define Exhaust_tolerance 90 // 0 a 100
 #define RANGE 1.85
 #define looptime 1 //Minuto
-#define desired_difference 5
-#define FILE_NAME "b.dat"
+#define desired_difference 0
+#define FILE_NAME "a.dat"
 
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
-     TEMPERATURE_SENSOR_09,
-     TEMPERATURE_SENSOR_10,
-     TEMPERATURE_SENSOR_11,
-     TEMPERATURE_SENSOR_12
+     TEMPERATURE_SENSOR_01,
+     TEMPERATURE_SENSOR_02,
+     TEMPERATURE_SENSOR_03,
+     TEMPERATURE_SENSOR_04
    };
                                       
 uint8_t sensor_out[MAX_SENSOR_OUT][8] = {
-    TEMPERATURE_SENSOR_13,
-    TEMPERATURE_SENSOR_14,
-    TEMPERATURE_SENSOR_15,
-    TEMPERATURE_SENSOR_16
+    TEMPERATURE_SENSOR_05,
+    TEMPERATURE_SENSOR_06,
+    TEMPERATURE_SENSOR_07,
+    TEMPERATURE_SENSOR_08
   };
 
 #define number_Moving_average 8
