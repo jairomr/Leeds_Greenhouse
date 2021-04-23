@@ -10,13 +10,14 @@
 
 
 bool debug = 0; // 0 off | 1 on
+bool status_file;
 #define MAX_SENSOR_INT 4
 #define MAX_SENSOR_OUT 4
-#define Exhaust_tolerance 70 // 0 a 100
+#define Exhaust_tolerance 90 // 0 a 100
 #define RANGE 1.85
 #define looptime 1 //Minuto
 #define desired_difference 0
-#define FILE_NAME "teste.dat"
+#define FILE_NAME "a.dat"
 
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
@@ -33,7 +34,7 @@ uint8_t sensor_out[MAX_SENSOR_OUT][8] = {
     TEMPERATURE_SENSOR_08
   };
 
-#define number_Moving_average 15
+#define number_Moving_average 8
 float temp_int_media[MAX_SENSOR_INT][number_Moving_average];
 float temp_out_media[MAX_SENSOR_OUT][number_Moving_average];
 float temp_int[MAX_SENSOR_INT];
@@ -64,20 +65,20 @@ void stater_datalooger(){
   pinMode(CS_PIN, OUTPUT);
   lcd.setCursor(3, 1);
   if (SD.begin(CS_PIN)){
-    lcd.print(F("SD was started"));
+    lcd.print(F("SD ok"));
   } else{
-    lcd.print(F("SD was not started"));
+    lcd.print(F("SD fall"));
   }
     lcd.setCursor(3, 3);
   if (!rtc.begin()){
-    lcd.print(F("RTC not found!!"));
+    lcd.print(F("RTC fall"));
   }
   lcd.setCursor(3, 2);
   if (!rtc.isrunning())
   {
-    lcd.print(F("RTC not operating!"));
+    lcd.print(F("RTC fall"));
   }else{
-    lcd.print(F("RTC operating!"));
+    lcd.print(F("RTC ok"));
   }
   if(debug == 1 ){
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -95,7 +96,7 @@ float temperature_validation(float valor){
 }
 
 
-float average(bool int_or_out){
+float average(int int_or_out){
   if(int_or_out == 0 ){
     __sum = 0;
     __cont = 0;
@@ -125,6 +126,20 @@ float average(bool int_or_out){
     }
     return -999;
 
+  }
+}
+
+
+void start_sensor(){
+  for (int i = 0; i < MAX_SENSOR_OUT; i++){
+    for (int j = 0; j < number_Moving_average; j++){
+      temp_out_media[i][j] = -999;
+    }
+  }
+  for (int i = 0; i < MAX_SENSOR_INT; i++){
+    for (int j = 0; j < number_Moving_average; j++){
+      temp_int_media[i][j] = -999;
+    }
   }
 }
 
@@ -237,6 +252,7 @@ void print_debug_status(){
 
 
 void setup() {
+  start_sensor();
   max_targetdiff = desired_difference + RANGE;
   min_targetdiff = desired_difference - RANGE;
   
@@ -262,7 +278,6 @@ void setup() {
   lcd.print(F("System started"));
   print_debug_status();
   stater_datalooger();
-  
 
 }
 
@@ -315,8 +330,6 @@ void print_status(){
 /**
  * End Prints
  */
-
-
 
 void climate_control_actions(){
   if (tempdiff < min_targetdiff) {
@@ -433,18 +446,37 @@ void fecha_arquivo(){
 void record_SD(){
   DateTime t = rtc.now();
   if(!SD.exists(FILE_NAME)){
-    open_file_recording();
+    status_file = open_file_recording();
+    if(status_file){
+      lcd.clear();
+      lcd.setCursor(2, 1);
+      lcd.print(F("Data successfully"));
+      lcd.setCursor(1, 2);
+      lcd.print(F("recorded on"));
+      lcd.setCursor(1, 3);
+      lcd.print(FILE_NAME);
+      delay(2000);
+    }else{
+      lcd.clear();
+      lcd.setCursor(2, 1);
+      lcd.print(F("ERROR when writing"));
+      lcd.setCursor(1, 2);
+      lcd.print(F("data to"));
+      lcd.setCursor(1, 3);
+      lcd.print(FILE_NAME);
+      delay(6000);
+    }
     file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,heating,exhaust\n"));
     lcd.clear();
     lcd.setCursor(0, 2);
-    lcd.print(F(" creating file "));
+    lcd.print(F(" creating file! "));
     lcd.setCursor(0, 3);
     lcd.print(FILE_NAME);
     delay(5000);
     file.close();
     
   }
-  bool status_file = open_file_recording();
+  status_file = open_file_recording();
   if(debug==1){
     if(status_file){
       lcd.clear();
@@ -463,7 +495,7 @@ void record_SD(){
       lcd.print(F("data to"));
       lcd.setCursor(1, 3);
       lcd.print(FILE_NAME);
-      delay(2000);
+      delay(6000);
     }
   }
   file.print(t.year());
@@ -497,9 +529,9 @@ void record_SD(){
       file.print(F(","));
     }
   }
-  file.print(FLAG_EXHAUST);
-  file.print(F(","));
   file.print(FLAG_HEATING);
+  file.print(F(","));
+  file.print(FLAG_EXHAUST);
   file.print(F("\n"));
   fecha_arquivo();
 }
@@ -508,6 +540,7 @@ void record_SD(){
  
 void loop() {
   read_temp_diff();
+  lcd.clear();  
   if(average_inside == -999 || average_outside == -999){
         
         lcd.clear();  
