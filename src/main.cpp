@@ -413,16 +413,17 @@ void record_SD(){
     
   }
   status_file = open_file_recording();
-  if(debug==1){
-    if(status_file){
-      lcd.clear();
-      lcd.setCursor(2, 1);
-      lcd.print(F("Data successfully"));
-      lcd.setCursor(1, 2);
-      lcd.print(F("recorded on"));
-      lcd.setCursor(1, 3);
-      lcd.print(FILE_NAME);
-      delay(2000);
+  if(status_file){
+      if(debug==1){
+        lcd.clear();
+        lcd.setCursor(2, 1);
+        lcd.print(F("Data successfully"));
+        lcd.setCursor(1, 2);
+        lcd.print(F("recorded on"));
+        lcd.setCursor(1, 3);
+        lcd.print(FILE_NAME);
+        delay(2000);
+      }
     }else{
       lcd.clear();
       lcd.setCursor(2, 1);
@@ -431,9 +432,9 @@ void record_SD(){
       lcd.print(F("data to"));
       lcd.setCursor(1, 3);
       lcd.print(FILE_NAME);
-      delay(6000);
+      delay(5000);
+      funcReset();
     }
-  }
   file.print(t.year());
   
   file.print("-");
