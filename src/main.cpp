@@ -11,13 +11,18 @@
 
 bool debug = 0; // 0 off | 1 on
 bool status_file;
+
+#define start_hour 8
+#define start_minutes 0
+
+#define end_hour 16
+#define end_minutes 30
+
+#define FILE_NAME "a.dat"
+
 #define MAX_SENSOR_INT 4
 #define MAX_SENSOR_OUT 4
-#define Exhaust_tolerance 90 // 0 a 100
-#define RANGE 1.85
 #define looptime 1 //Minuto
-#define desired_difference 0
-#define FILE_NAME "a.dat"
 
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
@@ -39,10 +44,9 @@ float temp_int_media[MAX_SENSOR_INT][number_Moving_average];
 float temp_out_media[MAX_SENSOR_OUT][number_Moving_average];
 float temp_int[MAX_SENSOR_INT];
 float temp_out[MAX_SENSOR_OUT];
-float average_inside, average_outside, tempdiff, min_targetdiff, max_targetdiff; 
+float average_inside, average_outside, tempdiff;
 
-
-bool FLAG_HEATING, FLAG_EXHAUST; // Flags 
+bool FLAG_EXHAUST; // Flags 
 
 
 int __cont = 0;
@@ -54,11 +58,15 @@ RTC_DS1307 rtc;
 
 File file;
 #define ONE_WIRE_BUS 3
-#define BUTTON_OFF 12
-#define BUTTON_ON 11
+#define BUTTON_OFF 4
+#define BUTTON_ON 1
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+
+void (*funcReset)() = 0;
+int erros = 0;
 
 
 void stater_datalooger(){
@@ -207,42 +215,8 @@ void read_temp_diff() {
  *
  **/
 
-/**
- * Simulate the button press by means of a relay, 
- * 0 for the off button and 1 for the on button
- * turn_on_or_off
- */
-void exhaust_turn_on_or_off(bool status){
-  if(status == LOW){
-    FLAG_EXHAUST = 0;
-    digitalWrite(BUTTON_OFF, HIGH);
-    delay(1000);
-    digitalWrite(BUTTON_OFF, LOW);
-  }else{
-    FLAG_EXHAUST = 1;
-    digitalWrite(BUTTON_ON, HIGH);
-    delay(1000);
-    digitalWrite(BUTTON_ON, LOW);
-  }
-}
 
 
-void heating_turn_on_or_off(bool status){
-  if(status == LOW){
-    FLAG_HEATING = 0;
-    digitalWrite(1, LOW);
-  }else{
-    FLAG_HEATING = 1;
-    digitalWrite(1, HIGH);
-  }
-
-}
-
-
-void all_off(){
-  heating_turn_on_or_off(LOW);
-  exhaust_turn_on_or_off(LOW);
-}
 void print_debug_status(){
   if(debug == 1){
     lcd.setCursor(18, 3);
@@ -253,21 +227,14 @@ void print_debug_status(){
 
 void setup() {
   start_sensor();
-  max_targetdiff = desired_difference + RANGE;
-  min_targetdiff = desired_difference - RANGE;
-  
   pinMode(BUTTON_ON, OUTPUT);
   pinMode(BUTTON_OFF, OUTPUT);
   pinMode(3, INPUT);
-  pinMode(4, OUTPUT);
-  pinMode(1, OUTPUT);
-  
-  all_off();
+ 
   
   sensors.begin();
   lcd.begin();
   lcd.backlight();
-  lcd.createChar(0, heppy);
   lcd.createChar(1, neve);
   lcd.createChar(2, fire);
   lcd.createChar(6, indor);
@@ -315,43 +282,35 @@ void print_good_or_bad(float d){
     lcd.print(F("x"));
   }
 }
-void print_status(){
-   lcd.setCursor(19, 3);
-   if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
-    lcd.write((uint8_t)0);
-  }else{
-    if(tempdiff < min_targetdiff ){
-      lcd.write((uint8_t)1);
-    }else{
-      lcd.write((uint8_t)2);
-    }
-  }
-}
 /**
  * End Prints
  */
 
 void climate_control_actions(){
-  if (tempdiff < min_targetdiff) {
-      exhaust_turn_on_or_off(LOW);    //turn air con off
-      heating_turn_on_or_off(HIGH);   //turn heating on
+  DateTime t = rtc.now();
+  int clock_now = t.hour()*60+t.minute();
+  if (
+    clock_now >= start_hour*60+start_minutes
+   && clock_now <= end_hour*60+end_minutes 
+  ) {
+    FLAG_EXHAUST = 1;
+    digitalWrite(BUTTON_ON, HIGH);
+    delay(2000);
+    digitalWrite(BUTTON_ON, LOW);
+  }else{
+    FLAG_EXHAUST = 0;
+    digitalWrite(BUTTON_OFF, HIGH);
+    delay(2000);
+    digitalWrite(BUTTON_OFF, LOW);
   }
-  if (tempdiff > max_targetdiff) {
-      heating_turn_on_or_off(LOW);   //turn heating off
-      exhaust_turn_on_or_off(HIGH); //turn air con off
-   }
- }
+  
+}
 
 
 void lcd_print(byte view) {
   lcd.clear();
   lcd.setCursor(0, 0);
-  print_tm_f(min_targetdiff);
-  lcd.print(F(" "));
-  print_tm_f(desired_difference); 
-  lcd.print(F(" "));
-  print_tm_f(max_targetdiff);
-  lcd.print(F(" "));
+  lcd.print(F("DIFF: "));
   print_tm_f(tempdiff);
   
 
@@ -375,18 +334,10 @@ void lcd_print(byte view) {
   lcd.setCursor(10, 2);
   lcd.print(F("| "));
   print_tm_f(average_outside);
-  
+  DateTime t = rtc.now();
   
   lcd.setCursor(0, 3);
   if(view == 0){
-        lcd.write((uint8_t)2);
-        lcd.print(F(" "));
-        if (FLAG_HEATING == HIGH ) {
-          lcd.write((uint8_t)3);
-        }else{
-          lcd.print(F("x"));
-        } 
-        lcd.print(F(" "));
         lcd.write((uint8_t)1);
         lcd.print(F(" "));
         if (FLAG_EXHAUST == HIGH)  {
@@ -397,15 +348,24 @@ void lcd_print(byte view) {
         lcd.print(F("   | FQ "));
         lcd.print(looptime);
    }else{
-        DateTime t = rtc.now();
+     if(erros == 0){
         lcd.print(F("Data: "));
         lcd.print(t.year());
         lcd.print(F("-"));
         print_decimal0(t.month());
         lcd.print(F("-"));
         print_decimal0(t.day());
+     }else{
+        lcd.print(F("Err:"));
+        lcd.print(erros);
+        lcd.print(t.year());
+        lcd.print(F("-"));
+        print_decimal0(t.month());
+        lcd.print(F("-"));
+        print_decimal0(t.day());
+      }
+        
         print_debug_status();
-        print_status();
         delay(3150);
         lcd.setCursor(0, 3);
         lcd.print(F("Hora: "));
@@ -416,13 +376,11 @@ void lcd_print(byte view) {
         print_decimal0(t.second());
         lcd.print(F("  "));
         print_debug_status();
-        print_status();
         
       }
 
   print_debug_status();
-  print_status();
-  delay(3150);
+  delay(3000);
 }
 
 
@@ -466,7 +424,7 @@ void record_SD(){
       lcd.print(FILE_NAME);
       delay(6000);
     }
-    file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,heating,exhaust\n"));
+    file.print(F("date,int_temp_1,int_temp_2,int_temp_3,int_temp_4,out_temp_1,out_temp_2,out_temp_3,out_temp_4,exhaust,v\n"));
     lcd.clear();
     lcd.setCursor(0, 2);
     lcd.print(F(" creating file! "));
@@ -477,16 +435,17 @@ void record_SD(){
     
   }
   status_file = open_file_recording();
-  if(debug==1){
-    if(status_file){
-      lcd.clear();
-      lcd.setCursor(2, 1);
-      lcd.print(F("Data successfully"));
-      lcd.setCursor(1, 2);
-      lcd.print(F("recorded on"));
-      lcd.setCursor(1, 3);
-      lcd.print(FILE_NAME);
-      delay(2000);
+  if(status_file){
+      if(debug==1){
+        lcd.clear();
+        lcd.setCursor(2, 1);
+        lcd.print(F("Data successfully"));
+        lcd.setCursor(1, 2);
+        lcd.print(F("recorded on"));
+        lcd.setCursor(1, 3);
+        lcd.print(FILE_NAME);
+        delay(2000);
+      }
     }else{
       lcd.clear();
       lcd.setCursor(2, 1);
@@ -495,9 +454,9 @@ void record_SD(){
       lcd.print(F("data to"));
       lcd.setCursor(1, 3);
       lcd.print(FILE_NAME);
-      delay(6000);
+      delay(5000);
+      funcReset();
     }
-  }
   file.print(t.year());
   
   file.print("-");
@@ -529,9 +488,9 @@ void record_SD(){
       file.print(F(","));
     }
   }
-  file.print(FLAG_HEATING);
-  file.print(F(","));
   file.print(FLAG_EXHAUST);
+  file.print(F(","));
+  file.print(F("1.0.0"));
   file.print(F("\n"));
   fecha_arquivo();
 }
@@ -540,36 +499,23 @@ void record_SD(){
  
 void loop() {
   read_temp_diff();
-  lcd.clear();  
+  lcd.clear(); 
+  climate_control_actions();  
   if(average_inside == -999 || average_outside == -999){
-        
-        lcd.clear();  
-        lcd.setCursor(0, 0);
-        lcd.print(F("     !!Error!!     "));
-        lcd.setCursor(0, 2);
-        lcd.print(F(" Temperature sensor "));
-        lcd.setCursor(0, 3);
-        lcd.print(F(" error, I can't act "));
-        print_debug_status();
-        all_off();  
-        delay(10000);
-    
+      erros = erros + 1;
+        if(erros > 20){
+          funcReset();
+        }
   }else{
-    if(tempdiff >= min_targetdiff && tempdiff <= max_targetdiff){
-      if (tempdiff <= (max_targetdiff-((RANGE+RANGE)*Exhaust_tolerance/100))){
-          all_off();
+      if(erros > 0){
+      erros = erros - 1;
       }
-    }
-    else{
-      climate_control_actions();  
-    }
-    record_SD();
-    for(int i = 0; i < looptime*6; i++ ){
-        lcd_print(1);
-        read_temp_diff();
-        lcd_print(0);
-    }
-
   }
-  
+  record_SD();
+  for(int i = 0; i < looptime*6; i++ ){
+    lcd_print(1);
+    read_temp_diff();
+    climate_control_actions();
+    lcd_print(0);
+  }
 }
