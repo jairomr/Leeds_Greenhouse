@@ -11,10 +11,18 @@
 
 bool debug = 0; // 0 off | 1 on
 bool status_file;
+
+#define start_hour 8
+#define start_minutes 0
+
+#define end_hour 16
+#define end_minutes 30
+
+#define FILE_NAME "a.dat"
+
 #define MAX_SENSOR_INT 4
 #define MAX_SENSOR_OUT 4
 #define looptime 1 //Minuto
-#define FILE_NAME "a.dat"
 
 
 uint8_t sensor_int[MAX_SENSOR_INT][8] = {
@@ -280,9 +288,11 @@ void print_good_or_bad(float d){
 
 void climate_control_actions(){
   DateTime t = rtc.now();
-
-// TODO colocar var de start and end time 
-  if (t.hour()*60+t.minute() >= 7*60+30 && t.hour()*60+t.minute() <= 16*60+30 ) {
+  int clock_now = t.hour()*60+t.minute();
+  if (
+    clock_now >= start_hour*60+start_minutes
+   && clock_now <= end_hour*60+end_minutes 
+  ) {
     FLAG_EXHAUST = 1;
     digitalWrite(BUTTON_ON, HIGH);
     delay(2000);
@@ -338,12 +348,23 @@ void lcd_print(byte view) {
         lcd.print(F("   | FQ "));
         lcd.print(looptime);
    }else{
+     if(erros == 0){
         lcd.print(F("Data: "));
         lcd.print(t.year());
         lcd.print(F("-"));
         print_decimal0(t.month());
         lcd.print(F("-"));
         print_decimal0(t.day());
+     }else{
+        lcd.print(F("Err:"));
+        lcd.print(erros);
+        lcd.print(t.year());
+        lcd.print(F("-"));
+        print_decimal0(t.month());
+        lcd.print(F("-"));
+        print_decimal0(t.day());
+      }
+        
         print_debug_status();
         delay(3150);
         lcd.setCursor(0, 3);
@@ -414,8 +435,7 @@ void record_SD(){
     
   }
   status_file = open_file_recording();
-  
-    if(status_file){
+  if(status_file){
       if(debug==1){
         lcd.clear();
         lcd.setCursor(2, 1);
@@ -437,7 +457,6 @@ void record_SD(){
       delay(5000);
       funcReset();
     }
-  
   file.print(t.year());
   
   file.print("-");
@@ -483,34 +502,20 @@ void loop() {
   lcd.clear(); 
   climate_control_actions();  
   if(average_inside == -999 || average_outside == -999){
-        lcd.clear();  
-        lcd.setCursor(0, 0);
-        lcd.print(F("     !!Error!!     "));
-        lcd.setCursor(0, 2);
-        lcd.print(F(" Temperature sensor "));
-        lcd.setCursor(0, 3);
-        lcd.print(F(" Error: "));
-        lcd.print(erros);
-        print_debug_status();
-        delay(5000);
-        erros = erros + 1;
+      erros = erros + 1;
         if(erros > 20){
           funcReset();
         }
-
-
   }else{
-    if(erros > 0){
+      if(erros > 0){
       erros = erros - 1;
-    }
-    record_SD();
-    for(int i = 0; i < looptime*6; i++ ){
-        lcd_print(1);
-        read_temp_diff();
-        climate_control_actions();
-        lcd_print(0);
-    }
-
+      }
   }
-  
+  record_SD();
+  for(int i = 0; i < looptime*6; i++ ){
+    lcd_print(1);
+    read_temp_diff();
+    climate_control_actions();
+    lcd_print(0);
+  }
 }
