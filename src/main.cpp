@@ -12,11 +12,11 @@
 bool debug = 0; // 0 off | 1 on
 bool status_file;
 
-#define start_hour 8
+#define start_hour 7
 #define start_minutes 0
 
 #define end_hour 16
-#define end_minutes 30
+#define end_minutes 0
 
 #define FILE_NAME "a.dat"
 
@@ -159,6 +159,7 @@ void _average_temp(){
   //externo
   for (int i = 0; i < MAX_SENSOR_OUT; i++){
     sensors.requestTemperatures();
+	delay(50);
     for (int j = number_Moving_average - 1; j > 0; j--){
       temp_out_media[i][j] = temp_out_media[i][j-1];
     }
@@ -183,6 +184,7 @@ void _average_temp(){
   // interno
   for (int i = 0; i < MAX_SENSOR_INT; i++){
     sensors.requestTemperatures();
+	delay(50);
     for (int j = number_Moving_average - 1; j > 0; j--){
       temp_int_media[i][j] = temp_int_media[i][j-1];
     }
@@ -229,6 +231,8 @@ void setup() {
   start_sensor();
   pinMode(BUTTON_ON, OUTPUT);
   pinMode(BUTTON_OFF, OUTPUT);
+  digitalWrite(BUTTON_ON, HIGH);
+  digitalWrite(BUTTON_OFF, HIGH);
   pinMode(3, INPUT);
  
   
@@ -294,14 +298,14 @@ void climate_control_actions(){
    && clock_now <= end_hour*60+end_minutes 
   ) {
     FLAG_EXHAUST = 1;
-    digitalWrite(BUTTON_ON, HIGH);
-    delay(2000);
     digitalWrite(BUTTON_ON, LOW);
+    delay(2000);
+    digitalWrite(BUTTON_ON, HIGH);
   }else{
     FLAG_EXHAUST = 0;
-    digitalWrite(BUTTON_OFF, HIGH);
-    delay(2000);
     digitalWrite(BUTTON_OFF, LOW);
+    delay(2000);
+    digitalWrite(BUTTON_OFF, HIGH);
   }
   
 }
@@ -357,7 +361,8 @@ void lcd_print(byte view) {
         print_decimal0(t.day());
      }else{
         lcd.print(F("Err:"));
-        lcd.print(erros);
+        print_decimal0(erros);
+		lcd.print(" ");
         lcd.print(t.year());
         lcd.print(F("-"));
         print_decimal0(t.month());
