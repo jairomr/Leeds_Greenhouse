@@ -8,9 +8,8 @@
 
 #include "Leeds_Help_Arduino.cpp"
 
-
-bool debug = 0; // 0 off | 1 on
-bool status_file;
+#define ESTUFA_A // Definacao para qual estufa ira ser compilado o codigo
+#define DEBUG_OFF // ON or OFF
 
 #define start_hour 8
 #define start_minutes 0
@@ -18,39 +17,21 @@ bool status_file;
 #define end_hour 16
 #define end_minutes 30
 
-#define FILE_NAME "a.dat"
 
-#define MAX_SENSOR_INT 4
-#define MAX_SENSOR_OUT 4
+bool status_file;
+
+
 #define looptime 1 //Minuto
 
+float int_1,int_2,int_3,int_4,out_1,out_2,out_3,out_4
 
-uint8_t sensor_int[MAX_SENSOR_INT][8] = {
-     TEMPERATURE_SENSOR_01,
-     TEMPERATURE_SENSOR_02,
-     TEMPERATURE_SENSOR_03,
-     TEMPERATURE_SENSOR_04
-   };
-                                      
-uint8_t sensor_out[MAX_SENSOR_OUT][8] = {
-    TEMPERATURE_SENSOR_05,
-    TEMPERATURE_SENSOR_06,
-    TEMPERATURE_SENSOR_07,
-    TEMPERATURE_SENSOR_08
-  };
-
-#define number_Moving_average 8
-float temp_int_media[MAX_SENSOR_INT][number_Moving_average];
-float temp_out_media[MAX_SENSOR_OUT][number_Moving_average];
-float temp_int[MAX_SENSOR_INT];
-float temp_out[MAX_SENSOR_OUT];
 float average_inside, average_outside, tempdiff;
 
 bool FLAG_EXHAUST; // Flags 
 
 
-int __cont = 0;
-float __sum = 0;
+byte __cont__ = 0;
+float __sum__ = 0;
 
 int CS_PIN = 10;
 
@@ -64,6 +45,11 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
+#ifdef ESTUFA_A
+#define FILE_NAME "a.dat"
+#else
+#define FILE_NAME "b.dat"
+#endif
 
 void (*funcReset)() = 0;
 int erros = 0;
@@ -88,9 +74,9 @@ void stater_datalooger(){
   }else{
     lcd.print(F("RTC ok"));
   }
-  if(debug == 1 ){
+  #ifdef DEBUG_ON
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
+  #endif
   delay(5000);
 }
 
@@ -103,125 +89,109 @@ float temperature_validation(float valor){
     }
 }
 
+void get_temp(){
+  sensors.requestTemperatures();
+//  delay(700);
+  #ifdef ESTUFA_A
+    int_1 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_01));
+    //delay(700);
+    int_2 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_02));
+    //delay(700);
+    int_3 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_03));
+    //delay(700);
+    int_4 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_04));
+    //delay(700);
+    out_1 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_05));
+    //delay(700);
+    out_2 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_06));
+    //delay(700);
+    out_3 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_07));
+    //delay(700);
+    out_4 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_08));
+  #else
+    int_1 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_09));
+    //delay(700);
+    int_2 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_10));
+    //delay(700);
+    int_3 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_11));
+    //delay(700);
+    int_4 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_12));
+    //delay(700);
+    out_1 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_13));
+    //delay(700);
+    out_2 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_14));
+    //delay(700);
+    out_3 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_15));
+    //delay(700);
+    out_4 = temperature_validation(sensors.getTempC(TEMPERATURE_SENSOR_16));
+  #endif
 
-float average(int int_or_out){
-  if(int_or_out == 0 ){
-    __sum = 0;
-    __cont = 0;
-    for (int i = 0; i < MAX_SENSOR_OUT; i++){
-      if(temp_out[i] != -999){
-        __sum = __sum + temp_out[i];
-        __cont = __cont + 1;
-      }
-      
-    }
-    if(__cont > 0){
-      return __sum/__cont;
-    }
-    return -999;
-  }else{
-    __sum = 0;
-    __cont = 0;
-    for (int i = 0; i < MAX_SENSOR_INT; i++){
-      if(temp_int[i] != -999){
-        __sum = __sum + temp_int[i];
-        __cont = __cont + 1;
-      }
-      
-    }
-    if(__cont > 0){
-      return __sum/__cont;
-    }
-    return -999;
 
-  }
-}
-
-
-void start_sensor(){
-  for (int i = 0; i < MAX_SENSOR_OUT; i++){
-    for (int j = 0; j < number_Moving_average; j++){
-      temp_out_media[i][j] = -999;
-    }
-  }
-  for (int i = 0; i < MAX_SENSOR_INT; i++){
-    for (int j = 0; j < number_Moving_average; j++){
-      temp_int_media[i][j] = -999;
-    }
-  }
 }
 
 /**
  * Start of code block responsible for collecting the temperature
  *
  **/
-void _average_temp(){
-  //externo
-  for (int i = 0; i < MAX_SENSOR_OUT; i++){
-    sensors.requestTemperatures();
-    for (int j = number_Moving_average - 1; j > 0; j--){
-      temp_out_media[i][j] = temp_out_media[i][j-1];
-    }
-    temp_out_media[i][0] = temperature_validation(sensors.getTempC(sensor_out[i]));
-    __sum = 0;
-    __cont = 0;
-    for (int j = 0; j < number_Moving_average; j++){
-      if(temp_out_media[i][j] != -999){
-        __sum = __sum + temp_out_media[i][j];
-        __cont = __cont + 1;
-      }
-    }
-    if(__cont > 0){
-      temp_out[i] = __sum/__cont;
-    }else{
-      temp_out[i] = -999;
-    }
-    delay(50);
+void average_temp(){
+  __sum__ = 0
+  __cont__ = 0
+  if(int_1 > -999){
+    __sum__ = __sum__ + int_1;
+    __cont__ = __cont__ + 1
   }
-  average_outside = average(0);
+  if(int_2 > -999){
+    __sum__ = __sum__ + int_2;
+    __cont__ = __cont__ + 1
+  }
+  if(int_3 > -999){
+    __sum__ = __sum__ + int_3;
+    __cont__ = __cont__ + 1
+  }
+  if(int_4 > -999){
+    __sum__ = __sum__ + int_4;
+    __cont__ = __cont__ + 1
+  }
 
-  // interno
-  for (int i = 0; i < MAX_SENSOR_INT; i++){
-    sensors.requestTemperatures();
-    for (int j = number_Moving_average - 1; j > 0; j--){
-      temp_int_media[i][j] = temp_int_media[i][j-1];
-    }
-    temp_int_media[i][0] = temperature_validation(sensors.getTempC(sensor_int[i]));
-    __sum = 0;
-    __cont = 0;
-    for (int j = 0; j < number_Moving_average; j++){
-      if(temp_int_media[i][j] != -999){
-        __sum = __sum + temp_int_media[i][j];
-        __cont = __cont + 1;
-      }
-    }
-    if(__cont > 0){
-      temp_int[i] = __sum/__cont;
-    }else{
-      temp_int[i] = -999;
-    }
-    delay(50);
+  average_inside = -999
+  if (__cont__> 0 ){
+    average_inside = __sum__/__cont__;
   }
-  average_inside = average(1);
   
+  ___sum__ = 0;
+  __cont__ = 0;
+  if(out_1 > -999){
+    __sum__ = __sum__ + out_1;
+    __cont__ = __cont__ + 1
+  }
+  if(out_2 > -999){
+    __sum__ = __sum__ + out_2;
+    __cont__ = __cont__ + 1
+  }
+  if(out_3 > -999){
+    __sum__ = __sum__ + out_3;
+    __cont__ = __cont__ + 1
+  }
+  if(out_4 > -999){
+    __sum__ = __sum__ + out_4;
+    __cont__ = __cont__ + 1
+  }
+  average_outside = -999
+  if (__cont__> 0 ){
+    average_outside = __sum__/__cont__;
+  }  // interno
+  
+
 }
 
 void read_temp_diff() {
-  _average_temp();
-  tempdiff = average_inside - average_outside;
-}
-/**
- * End of code block responsible for collecting the temperature
- *
- **/
-
-
-
-void print_debug_status(){
-  if(debug == 1){
-    lcd.setCursor(18, 3);
-    lcd.print("#");  
+  get_temp();
+  average_temp();
+  tempdiff = -999
+  if(average_inside > -999 & average_outside > -999){
+    tempdiff = average_inside - average_outside;
   }
+  
 }
 
 
@@ -243,7 +213,10 @@ void setup() {
   lcd.clear();
   lcd.setCursor(2, 0);
   lcd.print(F("System started"));
-  print_debug_status();
+  #ifdef DEBUG_ON
+    lcd.setCursor(18, 3);
+    lcd.print("#");
+  #endif
   stater_datalooger();
 
 }
@@ -318,9 +291,12 @@ void lcd_print(byte view) {
   
   lcd.write((uint8_t)6);
   lcd.print(F(" "));
-  for (int i=0; i < MAX_SENSOR_INT; i++){
-    print_good_or_bad(temp_int[i]);
-  }
+  
+  print_good_or_bad(int_1);
+  print_good_or_bad(int_2);
+  print_good_or_bad(int_3);
+  print_good_or_bad(int_4);
+  
   lcd.setCursor(10, 1);
   lcd.print(F("| "));
   print_tm_f(average_inside);
@@ -328,9 +304,12 @@ void lcd_print(byte view) {
   lcd.setCursor(0, 2);
   lcd.write((uint8_t)7);
   lcd.print(F(" "));
-  for (int i=0; i < MAX_SENSOR_OUT; i++){
-      print_good_or_bad(temp_out[i]);
-    }
+  
+  print_good_or_bad(out_1);
+  print_good_or_bad(out_2);
+  print_good_or_bad(out_3);
+  print_good_or_bad(out_4);
+
   lcd.setCursor(10, 2);
   lcd.print(F("| "));
   print_tm_f(average_outside);
@@ -365,7 +344,10 @@ void lcd_print(byte view) {
         print_decimal0(t.day());
       }
         
-        print_debug_status();
+        #ifdef DEBUG_ON
+          lcd.setCursor(18, 3);
+          lcd.print("#");
+        #endif
         delay(3150);
         lcd.setCursor(0, 3);
         lcd.print(F("Hora: "));
@@ -375,11 +357,17 @@ void lcd_print(byte view) {
         lcd.print(F(":"));
         print_decimal0(t.second());
         lcd.print(F("  "));
-        print_debug_status();
+        #ifdef DEBUG_ON
+          lcd.setCursor(18, 3);
+          lcd.print("#");
+        #endif
         
       }
 
-  print_debug_status();
+  #ifdef DEBUG_ON
+    lcd.setCursor(18, 3);
+    lcd.print("#");
+  #endif
   delay(3000);
 }
 
@@ -398,6 +386,17 @@ void fecha_arquivo(){
     file.close();
   }
 }
+
+void print_temperature(float valor){
+  if(i<valor){
+      file.print(temp_int[i]);
+      file.print(F(","));
+  }else{
+      file.print(F("NA"));
+      file.print(F(","));
+  }
+}
+
 
 
 //Grava dados no cartao SD
@@ -436,7 +435,7 @@ void record_SD(){
   }
   status_file = open_file_recording();
   if(status_file){
-      if(debug==1){
+    #ifdef DEBUG_ON
         lcd.clear();
         lcd.setCursor(2, 1);
         lcd.print(F("Data successfully"));
@@ -445,8 +444,7 @@ void record_SD(){
         lcd.setCursor(1, 3);
         lcd.print(FILE_NAME);
         delay(2000);
-      }
-    }else{
+    #else
       lcd.clear();
       lcd.setCursor(2, 1);
       lcd.print(F("ERROR when writing"));
@@ -456,7 +454,7 @@ void record_SD(){
       lcd.print(FILE_NAME);
       delay(5000);
       funcReset();
-    }
+   #endif
   file.print(t.year());
   
   file.print("-");
@@ -470,27 +468,21 @@ void record_SD(){
   file.print(F(":"));
   decimal_number_writing(t.second());
   file.print(F(","));
-  for (int i = 0; i < 4;i++){
-    if(i<MAX_SENSOR_INT){
-      file.print(temp_int[i]);
-      file.print(F(","));
-    }else{
-      file.print(F("NA"));
-      file.print(F(","));
-    }
-  }
-  for (int i = 0; i < 4;i++){
-    if(i<MAX_SENSOR_OUT){
-      file.print(temp_out[i]);
-      file.print(F(","));
-    }else{
-      file.print(F("NA"));
-      file.print(F(","));
-    }
-  }
+
+  print_temperature(int_1);
+  print_temperature(int_2);
+  print_temperature(int_3);
+  print_temperature(int_4);
+
+  print_temperature(out_1);
+  print_temperature(out_2);
+  print_temperature(out_3);
+  print_temperature(out_4);
+
+
   file.print(FLAG_EXHAUST);
   file.print(F(","));
-  file.print(F("1.0.0"));
+  file.print(F("2.0.0"));
   file.print(F("\n"));
   fecha_arquivo();
 }
