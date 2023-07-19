@@ -12,11 +12,12 @@
 bool debug = 0; // 0 off | 1 on
 bool status_file;
 
-#define start_hour 7
-#define start_minutes 0
+#define start_off_hour 10
+#define start_off_minutes_1 0
 
-#define end_hour 16
-#define end_minutes 0
+#define end_off_end_hour_1 13
+#define end_off_end_minutes_1 0
+
 
 #define FILE_NAME "a.dat"
 
@@ -294,18 +295,18 @@ void climate_control_actions(){
   DateTime t = rtc.now();
   int clock_now = t.hour()*60+t.minute();
   if (
-    clock_now >= start_hour*60+start_minutes
-   && clock_now <= end_hour*60+end_minutes 
+    clock_now >= start_off_hour*60+start_off__minutes && clock_now <= end_off__hour*60+end__off_minutes
   ) {
-    FLAG_EXHAUST = 1;
-    digitalWrite(BUTTON_ON, LOW);
-    delay(2000);
-    digitalWrite(BUTTON_ON, HIGH);
-  }else{
     FLAG_EXHAUST = 0;
     digitalWrite(BUTTON_OFF, LOW);
     delay(2000);
     digitalWrite(BUTTON_OFF, HIGH);
+  }else{
+    FLAG_EXHAUST = 1;
+    digitalWrite(BUTTON_ON, LOW);
+    delay(2000);
+    digitalWrite(BUTTON_ON, HIGH);
+    
   }
   
 }
